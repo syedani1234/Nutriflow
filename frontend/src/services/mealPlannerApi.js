@@ -5,7 +5,7 @@ import api from "./api";
 // ==========================================================
 
 export async function generateMealPlan(mealPlanData) {
-  if (!mealPlanData) {
+  if (!mealPlanData || typeof mealPlanData !== "object") {
     throw new Error("Meal plan data is required.");
   }
 
