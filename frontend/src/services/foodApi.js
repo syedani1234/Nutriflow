@@ -1,25 +1,20 @@
 import api from "./api";
 
 // ==========================================================
-// GET ALL FOODS
+// LIST FOODS
 // ==========================================================
 
-export async function getFoods({
+export async function listFoods({
   skip = 0,
   limit = 20,
-  category = null,
+  category,
 } = {}) {
-  const params = {
-    skip,
-    limit,
-  };
-
-  if (category) {
-    params.category = category;
-  }
-
   const response = await api.get("/foods", {
-    params,
+    params: {
+      skip,
+      limit,
+      ...(category ? { category } : {}),
+    },
   });
 
   return response.data;
@@ -29,16 +24,14 @@ export async function getFoods({
 // SEARCH FOODS
 // ==========================================================
 
-export async function searchFoods(
-  query,
-  {
-    skip = 0,
-    limit = 20,
-  } = {}
-) {
+export async function searchFoods({
+  q,
+  skip = 0,
+  limit = 20,
+}) {
   const response = await api.get("/foods/search", {
     params: {
-      q: query,
+      q,
       skip,
       limit,
     },
@@ -72,7 +65,10 @@ export async function addFood(foodData) {
 // ==========================================================
 
 export async function updateFood(foodId, foodData) {
-  const response = await api.put(`/foods/${foodId}`, foodData);
+  const response = await api.put(
+    `/foods/${foodId}`,
+    foodData
+  );
 
   return response.data;
 }

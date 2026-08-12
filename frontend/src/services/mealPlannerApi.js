@@ -5,6 +5,10 @@ import api from "./api";
 // ==========================================================
 
 export async function generateMealPlan(mealPlanData) {
+  if (!mealPlanData) {
+    throw new Error("Meal plan data is required.");
+  }
+
   const response = await api.post(
     "/meal-planner/generate",
     mealPlanData
