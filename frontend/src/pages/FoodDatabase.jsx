@@ -10,6 +10,10 @@ import {
   deleteFood,
 } from "../services/foodApi";
 
+// ==========================================================
+// CONSTANTS
+// ==========================================================
+
 const EMPTY_FORM = {
   name: "",
   category: "",
@@ -33,8 +37,13 @@ const CATEGORIES = [
   "Beverages",
 ];
 
+// ==========================================================
+// MAIN COMPONENT
+// ==========================================================
+
 export default function FoodDatabase() {
   const [foods, setFoods] = useState([]);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
 
@@ -46,12 +55,11 @@ export default function FoodDatabase() {
 
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-
   const [deletingId, setDeletingId] = useState(null);
 
-  // ==========================================================
+  // ========================================================
   // LOAD FOODS
-  // ==========================================================
+  // ========================================================
 
   async function loadFoods() {
     try {
@@ -80,9 +88,9 @@ export default function FoodDatabase() {
     loadFoods();
   }, [category]);
 
-  // ==========================================================
+  // ========================================================
   // SEARCH
-  // ==========================================================
+  // ========================================================
 
   async function handleSearch(event) {
     event.preventDefault();
@@ -116,19 +124,45 @@ export default function FoodDatabase() {
     }
   }
 
-  // ==========================================================
-  // OPEN ADD MODAL
-  // ==========================================================
+  // ========================================================
+  // CLEAR FILTERS
+  // ========================================================
+
+  async function clearFilters() {
+    setSearch("");
+    setCategory("");
+
+    try {
+      setLoading(true);
+
+      const data = await listFoods({
+        skip: 0,
+        limit: 100,
+      });
+
+      setFoods(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to reload foods:", error);
+
+      toast.error("Unable to reload the food database.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ========================================================
+  // ADD FOOD MODAL
+  // ========================================================
 
   function openAddModal() {
     setEditingFood(null);
-    setFormData(EMPTY_FORM);
+    setFormData({ ...EMPTY_FORM });
     setShowModal(true);
   }
 
-  // ==========================================================
-  // OPEN EDIT MODAL
-  // ==========================================================
+  // ========================================================
+  // EDIT FOOD MODAL
+  // ========================================================
 
   function openEditModal(food) {
     setEditingFood(food);
@@ -149,41 +183,55 @@ export default function FoodDatabase() {
     setShowModal(true);
   }
 
-  // ==========================================================
+  // ========================================================
+  // CLOSE MODAL
+  // ========================================================
+
+  function closeModal() {
+    if (saving) {
+      return;
+    }
+
+    setShowModal(false);
+    setEditingFood(null);
+    setFormData({ ...EMPTY_FORM });
+  }
+
+  // ========================================================
   // FORM CHANGE
-  // ==========================================================
+  // ========================================================
 
   function handleChange(event) {
     const { name, value } = event.target;
 
     setFormData((previous) => ({
       ...previous,
-      [name]:
-        name === "serving_size" ||
-        name === "calories" ||
-        name === "protein" ||
-        name === "carbohydrates" ||
-        name === "fat" ||
-        name === "fiber"
-          ? value
-          : value,
+      [name]: value,
     }));
   }
 
-  // ==========================================================
+  // ========================================================
   // SAVE FOOD
-  // ==========================================================
+  // ========================================================
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!formData.name.trim()) {
+    const name = formData.name.trim();
+    const servingSize = Number(formData.serving_size);
+
+    if (!name) {
       toast.error("Food name is required.");
       return;
     }
 
-    if (Number(formData.serving_size) <= 0) {
+    if (!servingSize || servingSize <= 0) {
       toast.error("Serving size must be greater than zero.");
+      return;
+    }
+
+    if (!formData.serving_unit.trim()) {
+      toast.error("Serving unit is required.");
       return;
     }
 
@@ -191,16 +239,19 @@ export default function FoodDatabase() {
       setSaving(true);
 
       const payload = {
-        name: formData.name.trim(),
+        name,
         category: formData.category || null,
         description: formData.description.trim() || null,
-        serving_size: Number(formData.serving_size),
+
+        serving_size: servingSize,
         serving_unit: formData.serving_unit.trim(),
-        calories: Number(formData.calories),
-        protein: Number(formData.protein),
-        carbohydrates: Number(formData.carbohydrates),
-        fat: Number(formData.fat),
-        fiber: Number(formData.fiber),
+
+        calories: Number(formData.calories) || 0,
+        protein: Number(formData.protein) || 0,
+        carbohydrates:
+          Number(formData.carbohydrates) || 0,
+        fat: Number(formData.fat) || 0,
+        fiber: Number(formData.fiber) || 0,
       };
 
       if (editingFood) {
@@ -213,9 +264,7 @@ export default function FoodDatabase() {
         toast.success("Food added successfully.");
       }
 
-      setShowModal(false);
-      setEditingFood(null);
-      setFormData(EMPTY_FORM);
+      closeModal();
 
       await loadFoods();
     } catch (error) {
@@ -230,9 +279,9 @@ export default function FoodDatabase() {
     }
   }
 
-  // ==========================================================
+  // ========================================================
   // DELETE FOOD
-  // ==========================================================
+  // ========================================================
 
   async function handleDelete(food) {
     const confirmed = window.confirm(
@@ -248,11 +297,11 @@ export default function FoodDatabase() {
 
       await deleteFood(food.id);
 
-      toast.success("Food deleted successfully.");
-
       setFoods((previous) =>
         previous.filter((item) => item.id !== food.id)
       );
+
+      toast.success("Food deleted successfully.");
     } catch (error) {
       console.error("Failed to delete food:", error);
 
@@ -265,27 +314,33 @@ export default function FoodDatabase() {
     }
   }
 
+  // ========================================================
+  // RENDER
+  // ========================================================
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
+      {/* ====================================================
+          PAGE HEADER
+      ==================================================== */}
 
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-emerald-600">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-emerald-700">
+                <span>🥗</span>
                 NutriFlow
-              </p>
+              </div>
 
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
                 Food Database
               </h1>
 
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
                 Explore nutritional information and manage
-                foods available to your meal planner.
+                the foods available throughout your NutriFlow
+                experience.
               </p>
             </div>
 
@@ -294,13 +349,13 @@ export default function FoodDatabase() {
                 to="/meal-planner"
                 className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-600"
               >
-                Create Meal Plan
+                🍽️ Create Meal Plan
               </Link>
 
               <button
                 type="button"
                 onClick={openAddModal}
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 hover:shadow-md"
               >
                 + Add Food
               </button>
@@ -309,28 +364,36 @@ export default function FoodDatabase() {
         </div>
       </section>
 
-      {/* ======================================================
-          MAIN
-      ====================================================== */}
+      {/* ====================================================
+          MAIN CONTENT
+      ==================================================== */}
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Search / Filter */}
+        {/* ==================================================
+            SEARCH / FILTER
+        ================================================== */}
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row">
             <form
               onSubmit={handleSearch}
-              className="flex flex-1 gap-3"
+              className="flex min-w-0 flex-1 gap-3"
             >
-              <input
-                type="text"
-                value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
-                placeholder="Search foods..."
-                className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-              />
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  🔎
+                </span>
+
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) =>
+                    setSearch(event.target.value)
+                  }
+                  placeholder="Search foods..."
+                  className="w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                />
+              </div>
 
               <button
                 type="submit"
@@ -346,7 +409,7 @@ export default function FoodDatabase() {
               onChange={(event) =>
                 setCategory(event.target.value)
               }
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 lg:w-56"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 lg:w-56"
             >
               <option value="">All categories</option>
 
@@ -359,9 +422,11 @@ export default function FoodDatabase() {
           </div>
         </section>
 
-        {/* Results Header */}
+        {/* ==================================================
+            RESULTS HEADER
+        ================================================== */}
 
-        <div className="mt-8 flex items-center justify-between">
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-extrabold text-slate-900">
               Available Foods
@@ -372,64 +437,72 @@ export default function FoodDatabase() {
               {foods.length !== 1 ? "s" : ""} found
             </p>
           </div>
+
+          {(search || category) && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-left text-sm font-semibold text-emerald-600 transition hover:text-emerald-700 sm:text-right"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
-        {/* Loading */}
+        {/* ==================================================
+            LOADING STATE
+        ================================================== */}
 
         {loading && (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5"
-              >
-                <div className="h-5 w-32 rounded bg-slate-200" />
-
-                <div className="mt-3 h-4 w-20 rounded bg-slate-100" />
-
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <div className="h-16 rounded-xl bg-slate-100" />
-                  <div className="h-16 rounded-xl bg-slate-100" />
-                  <div className="h-16 rounded-xl bg-slate-100" />
-                  <div className="h-16 rounded-xl bg-slate-100" />
-                </div>
-              </div>
+              <FoodSkeleton key={index} />
             ))}
           </div>
         )}
 
-        {/* Empty */}
+        {/* ==================================================
+            EMPTY STATE
+        ================================================== */}
 
         {!loading && foods.length === 0 && (
           <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl">
               🥗
             </div>
 
-            <h3 className="mt-4 text-lg font-bold text-slate-900">
+            <h3 className="mt-5 text-lg font-bold text-slate-900">
               No foods found
             </h3>
 
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-              Try another search term or select a different
-              category.
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+              We couldn't find any foods matching your
+              current search or category.
             </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setCategory("");
-                loadFoods();
-              }}
-              className="mt-5 font-semibold text-emerald-600 hover:text-emerald-700"
-            >
-              Clear filters
-            </button>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
+              >
+                Clear Filters
+              </button>
+
+              <button
+                type="button"
+                onClick={openAddModal}
+                className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+              >
+                + Add Food
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Food Cards */}
+        {/* ==================================================
+            FOOD GRID
+        ================================================== */}
 
         {!loading && foods.length > 0 && (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -446,9 +519,9 @@ export default function FoodDatabase() {
         )}
       </main>
 
-      {/* ======================================================
-          ADD / EDIT MODAL
-      ====================================================== */}
+      {/* ====================================================
+          MODAL
+      ==================================================== */}
 
       {showModal && (
         <FoodModal
@@ -457,13 +530,7 @@ export default function FoodDatabase() {
           saving={saving}
           onChange={handleChange}
           onSubmit={handleSubmit}
-          onClose={() => {
-            if (!saving) {
-              setShowModal(false);
-              setEditingFood(null);
-              setFormData(EMPTY_FORM);
-            }
-          }}
+          onClose={closeModal}
         />
       )}
     </div>
@@ -482,9 +549,11 @@ function FoodCard({
 }) {
   return (
     <article className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-extrabold text-slate-900">
+      {/* Header */}
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-extrabold text-slate-900">
             {food.name}
           </h3>
 
@@ -495,8 +564,12 @@ function FoodCard({
           )}
         </div>
 
-        <span className="text-2xl">🥗</span>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl">
+          🥗
+        </div>
       </div>
+
+      {/* Serving */}
 
       <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -508,7 +581,9 @@ function FoodCard({
         </p>
       </div>
 
-      <div className="mt-4 rounded-xl bg-emerald-50 p-4">
+      {/* Calories */}
+
+      <div className="mt-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
           Calories
         </p>
@@ -524,12 +599,31 @@ function FoodCard({
         </div>
       </div>
 
+      {/* Macros */}
+
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Macro label="Protein" value={food.protein} />
-        <Macro label="Carbs" value={food.carbohydrates} />
-        <Macro label="Fat" value={food.fat} />
-        <Macro label="Fiber" value={food.fiber} />
+        <Macro
+          label="Protein"
+          value={food.protein}
+        />
+
+        <Macro
+          label="Carbs"
+          value={food.carbohydrates}
+        />
+
+        <Macro
+          label="Fat"
+          value={food.fat}
+        />
+
+        <Macro
+          label="Fiber"
+          value={food.fiber}
+        />
       </div>
+
+      {/* Description */}
 
       {food.description && (
         <p className="mt-4 line-clamp-2 text-sm leading-5 text-slate-500">
@@ -543,7 +637,7 @@ function FoodCard({
         <button
           type="button"
           onClick={() => onEdit(food)}
-          className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-600"
+          className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
         >
           Edit
         </button>
@@ -562,7 +656,7 @@ function FoodCard({
 }
 
 // ==========================================================
-// MACRO
+// MACRO CARD
 // ==========================================================
 
 function Macro({ label, value }) {
@@ -580,7 +674,37 @@ function Macro({ label, value }) {
 }
 
 // ==========================================================
-// ADD / EDIT FOOD MODAL
+// SKELETON
+// ==========================================================
+
+function FoodSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex justify-between">
+        <div>
+          <div className="h-5 w-36 rounded bg-slate-200" />
+          <div className="mt-3 h-5 w-20 rounded-full bg-slate-100" />
+        </div>
+
+        <div className="h-11 w-11 rounded-xl bg-slate-100" />
+      </div>
+
+      <div className="mt-5 h-14 rounded-xl bg-slate-100" />
+
+      <div className="mt-4 h-24 rounded-xl bg-slate-100" />
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="h-16 rounded-xl bg-slate-100" />
+        <div className="h-16 rounded-xl bg-slate-100" />
+        <div className="h-16 rounded-xl bg-slate-100" />
+        <div className="h-16 rounded-xl bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================
+// FOOD MODAL
 // ==========================================================
 
 function FoodModal({
@@ -592,7 +716,11 @@ function FoodModal({
   onClose,
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
         {/* Modal Header */}
 
@@ -604,8 +732,8 @@ function FoodModal({
 
             <p className="mt-1 text-sm text-slate-500">
               {editingFood
-                ? "Update the nutritional information."
-                : "Add a food to the NutriFlow database."}
+                ? "Update the nutritional information for this food."
+                : "Add nutritional information to the NutriFlow food database."}
             </p>
           </div>
 
@@ -613,7 +741,8 @@ function FoodModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg text-slate-500 transition hover:bg-slate-200"
+            aria-label="Close modal"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
           >
             ×
           </button>
@@ -621,15 +750,14 @@ function FoodModal({
 
         {/* Form */}
 
-        <form onSubmit={onSubmit} className="space-y-6 p-6">
-          {/* Basic information */}
+        <form
+          onSubmit={onSubmit}
+          className="space-y-7 p-6"
+        >
+          {/* Basic Information */}
 
-          <div>
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              Basic Information
-            </h3>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <FormSection title="Basic Information">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Food Name"
                 name="name"
@@ -640,17 +768,23 @@ function FoodModal({
               />
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label
+                  htmlFor="category"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
+                >
                   Category
                 </label>
 
                 <select
+                  id="category"
                   name="category"
                   value={formData.category}
                   onChange={onChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 >
-                  <option value="">Select category</option>
+                  <option value="">
+                    Select category
+                  </option>
 
                   {CATEGORIES.map((item) => (
                     <option key={item} value={item}>
@@ -662,29 +796,29 @@ function FoodModal({
             </div>
 
             <div className="mt-4">
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label
+                htmlFor="description"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
                 Description
               </label>
 
               <textarea
+                id="description"
                 name="description"
                 value={formData.description}
                 onChange={onChange}
                 rows={3}
                 placeholder="Short description of this food..."
-                className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               />
             </div>
-          </div>
+          </FormSection>
 
           {/* Serving */}
 
-          <div>
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              Serving Information
-            </h3>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <FormSection title="Serving Information">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Serving Size"
                 name="serving_size"
@@ -705,16 +839,12 @@ function FoodModal({
                 required
               />
             </div>
-          </div>
+          </FormSection>
 
           {/* Nutrition */}
 
-          <div>
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              Nutrition per Serving
-            </h3>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <FormSection title="Nutrition Per Serving">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Calories (kcal)"
                 name="calories"
@@ -765,7 +895,7 @@ function FoodModal({
                 onChange={onChange}
               />
             </div>
-          </div>
+          </FormSection>
 
           {/* Actions */}
 
@@ -798,7 +928,23 @@ function FoodModal({
 }
 
 // ==========================================================
-// FIELD
+// FORM SECTION
+// ==========================================================
+
+function FormSection({ title, children }) {
+  return (
+    <section>
+      <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
+        {title}
+      </h3>
+
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+// ==========================================================
+// FORM FIELD
 // ==========================================================
 
 function Field({
