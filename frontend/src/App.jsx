@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import NutritionProfile from "./pages/NutritionProfile";
 import MealPlanner from "./pages/MealPlanner";
 import FoodDatabase from "./pages/FoodDatabase";
+import FoodDetails from "./pages/FoodDetails";
 import NotFound from "./pages/NotFound";
 
 // ==========================================================
@@ -24,7 +25,6 @@ import NotFound from "./pages/NotFound";
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
 
-  // Wait until authentication state is restored
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -39,7 +39,6 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // User is not logged in
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -56,11 +55,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* ==================================================
-          MAIN LAYOUT
-      ================================================== */}
-
       <Route element={<MainLayout />}>
+
         {/* ==================================================
             HOME
         ================================================== */}
@@ -159,10 +155,27 @@ function AppRoutes() {
         />
 
         {/* ==================================================
+            FOOD DETAILS
+        ================================================== */}
+
+        <Route
+          path="/foods/:foodId"
+          element={
+            <ProtectedRoute>
+              <FoodDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ==================================================
             404
         ================================================== */}
 
-        <Route path="*" element={<NotFound />} />
+        <Route
+          path="*"
+          element={<NotFound />}
+        />
+
       </Route>
     </Routes>
   );
